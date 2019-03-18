@@ -1,0 +1,45 @@
+service: ecs-codepipeline-slack
+
+# You can pin your service to only deploy with a specific Serverless version
+# Check out our docs for more details
+# frameworkVersion: "=X.X.X"
+provider:
+  name: aws
+  runtime: python3.7
+  stage: ${opt:stage}
+  profile: ${file(./conf/${self:provider.stage}.yml):AWS_PROFILE}
+  region: ${file(./conf/${self:provider.stage}.yml):REGION}
+  # please customize these params conforming with your env
+  memorySize: 256
+  timeout: 30
+  logRetentionInDays: 7
+  # stackTags:
+  #  hoge:
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "codepipeline:*"
+      Resource:
+        - "*"
+
+plugins:
+  - serverless-python-requirements
+functions:
+  notify:
+    handler: handler.lambda_handler
+    description: Post CodePipeline and related services notifications to Slack
+    environment:
+      SLACK_WEBHOOK_URL: ${file(./conf/${self:provider.stage}.yml):SLACK_WEBHOOK_URL}
+      STAGE: ${self:provider.stage}
+    events:
+      - cloudwatchEvent:
+          event:
+            source:
+              - "aws.codepipeline"
+              - "aws.codebuild"
+              - "aws.ecs"
+            detail-type:
+              - "CodePipeline Pipeline Execution State Change"
+              - "CodePipeline Stage Execution State Change"
+              - "CodeBuild Build State Change"
+              - "ECS Task State Change"
